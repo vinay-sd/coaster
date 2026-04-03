@@ -3,302 +3,193 @@
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <!--
-    DEPLOYMENT INSTRUCTIONS
-    ───────────────────────
-    1. Place this index.html and your .mind file in the same Netlify folder.
-    2. Rename your .mind file to:  targets.mind
-    3. That's it — no other assets needed.
-
-    FIXES APPLIED
-    ─────────────
-    • Upgraded A-Frame 1.5.0 → 1.6.0  (fixes charAt / applyColorCorrection crashes)
-    • Fixed renderer="physicallyCorrectLights: true"  (was missing ": true")
-    • Removed invalid `emitevents` from cursor  (was logging schema warning)
-    • Removed a-image data-URI buttons  (XHR texture pipeline crashed on them)
-    • Replaced 3D icons with pure a-plane geometry  (zero external requests)
-    • Script order: A-Frame first, then MindAR  (required by MindAR)
+    DEPLOYMENT
+    ─────────────────────────────────────────────────────────────────
+    1. Compile the coaster photo at the MindAR compiler tool:
+       https://hiukim.github.io/mind-ar-js-doc/tools/compile
+    2. Save the output file as:  targets.mind
+    3. Place targets.mind + this index.html in the same folder
+    4. Deploy to Netlify / Vercel (HTTPS required for camera access)
+    5. Update the Instagram / LinkedIn / Website hrefs at the bottom
+    ─────────────────────────────────────────────────────────────────
+    AR DESIGN CONCEPT
+    The coaster itself shows through the camera — no opaque plane
+    covers it. Everything emerges *around* and *above* the coaster:
+      • Two counter-rotating halo rings orbit the perimeter
+      • A tilted golden portal ring floats above with a riding sphere
+      • Three spheres orbit the coaster at different speeds / radii
+      • The "drishti" (vision) eye motif pulses above the coaster
+      • "SOCIAL DRISHTI" text bobs gently high above
+      • Four keyword pills float on the sides (INSIGHTS / STRATEGY
+        / VISION / IMPACT), each with a gentle breathing animation
+      • Six rising particles stream upward on loop
   -->
 
-  <!-- 1. A-Frame FIRST — MindAR must patch it on load -->
+  <!-- A-Frame FIRST, then MindAR (MindAR must patch A-Frame on load) -->
   <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
-  <!-- 2. MindAR A-Frame bundle (already includes its own core) -->
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
 
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
-      overflow: hidden;
-      background: #000;
+      overflow: hidden; background: #0a0305;
       font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
       -webkit-font-smoothing: antialiased;
     }
 
-    /* ─── MindAR scanning overlay ─────────────────────────────────── */
+    /* ─── SCANNING OVERLAY ─────────────────────────────────────── */
     #scanning-overlay {
       position: fixed; inset: 0;
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      pointer-events: none;
-      z-index: 30;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      pointer-events: none; z-index: 30;
     }
     #scanning-overlay.hidden { display: none; }
 
-    .scan-frame {
-      position: relative;
-      width: 240px; height: 240px;
-      margin-bottom: 40px;
-    }
+    .scan-frame { position: relative; width: 220px; height: 220px; margin-bottom: 20px; }
 
-    /* Four corner brackets */
+    /* Rounded-square corners to hint at the coaster shape */
     .scan-frame::before, .scan-frame::after,
     .scan-frame .c::before, .scan-frame .c::after {
-      content: ''; position: absolute;
-      width: 36px; height: 36px;
+      content: ''; position: absolute; width: 38px; height: 38px;
     }
-    .scan-frame::before {
-      top: 0; left: 0;
-      border-top: 3px solid #fff; border-left: 3px solid #fff;
-      border-radius: 5px 0 0 0;
-    }
-    .scan-frame::after {
-      top: 0; right: 0;
-      border-top: 3px solid #fff; border-right: 3px solid #fff;
-      border-radius: 0 5px 0 0;
-    }
-    .scan-frame .c::before {
-      bottom: 0; left: 0;
-      border-bottom: 3px solid #fff; border-left: 3px solid #fff;
-      border-radius: 0 0 0 5px;
-    }
-    .scan-frame .c::after {
-      bottom: 0; right: 0;
-      border-bottom: 3px solid #fff; border-right: 3px solid #fff;
-      border-radius: 0 0 5px 0;
+    .scan-frame::before  { top:0; left:0;  border-top:2.5px solid #F5A623; border-left:2.5px solid #F5A623;   border-radius:11px 0 0 0; }
+    .scan-frame::after   { top:0; right:0; border-top:2.5px solid #F5A623; border-right:2.5px solid #F5A623;  border-radius:0 11px 0 0; }
+    .scan-frame .c::before { bottom:0; left:0;  border-bottom:2.5px solid #F5A623; border-left:2.5px solid #F5A623;  border-radius:0 0 0 11px; }
+    .scan-frame .c::after  { bottom:0; right:0; border-bottom:2.5px solid #F5A623; border-right:2.5px solid #F5A623; border-radius:0 0 11px 0; }
+
+    .scan-inner {
+      position: absolute; inset: 16px; border-radius: 10px;
+      background: rgba(139,90,113,0.1); border: 1px solid rgba(245,166,35,0.13);
+      display: flex; align-items: center; justify-content: center;
     }
 
-    /* Animated sweep line */
+    /* Recreate the SD "O" ring as the scan hint */
+    .sd-hint-ring {
+      width: 50px; height: 50px; border-radius: 50%;
+      border: 7px solid rgba(245,166,35,0.55); border-bottom-color: transparent;
+      animation: spin-hint 2s linear infinite;
+    }
+    @keyframes spin-hint { to { transform: rotate(360deg); } }
+
     .scan-line {
-      position: absolute; left: 8px; right: 8px; height: 2px;
-      border-radius: 1px;
-      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.9), transparent);
-      animation: sweep 2.4s ease-in-out infinite;
+      position: absolute; left: 16px; right: 16px; height: 1.5px;
+      background: linear-gradient(90deg, transparent, rgba(245,166,35,0.75), transparent);
+      animation: sweep 2.2s ease-in-out infinite;
     }
     @keyframes sweep {
-      0%   { top: 8px;   opacity: 0; }
-      15%  { opacity: 1; }
-      85%  { opacity: 1; }
-      100% { top: 230px; opacity: 0; }
+      0%   { top:16px;  opacity:0; }
+      15%  { opacity:1; }
+      85%  { opacity:1; }
+      100% { top:204px; opacity:0; }
     }
 
-    .scan-label {
-      color: rgba(255,255,255,0.9);
-      font-size: 13px;
-      font-weight: 700;
-      letter-spacing: 3.5px;
-      text-transform: uppercase;
-      text-shadow: 0 1px 10px rgba(0,0,0,0.7);
-    }
-    .scan-sub {
-      margin-top: 10px;
-      color: rgba(255,255,255,0.38);
-      font-size: 12px;
-      letter-spacing: 0.4px;
-    }
+    .scan-label { color: rgba(255,255,255,0.85); font-size:12px; font-weight:700; letter-spacing:3.5px; text-transform:uppercase; text-shadow:0 1px 10px rgba(0,0,0,0.9); }
+    .scan-sub   { margin-top:8px; color:rgba(245,237,232,0.3); font-size:11px; }
 
-    /* ─── Action panel (slides up on target found) ─────────────────── */
+    /* ─── ACTION PANEL ─────────────────────────────────────────── */
     #action-panel {
-      position: fixed;
-      left: 0; right: 0; bottom: -320px;
-      z-index: 40;
-
-      background: rgba(6, 8, 20, 0.97);
-      backdrop-filter: blur(30px) saturate(160%);
-      -webkit-backdrop-filter: blur(30px) saturate(160%);
-
-      border-top: 1px solid rgba(255,255,255,0.07);
-      border-radius: 24px 24px 0 0;
-      padding: 14px 28px 56px;
-
-      transition: bottom 0.52s cubic-bezier(0.34, 1.36, 0.64, 1);
+      position: fixed; left:0; right:0; bottom:-340px; z-index:40;
+      background: rgba(14,4,8,0.97);
+      backdrop-filter: blur(32px) saturate(160%);
+      -webkit-backdrop-filter: blur(32px) saturate(160%);
+      border-top: 1px solid rgba(245,166,35,0.16);
+      border-radius: 26px 26px 0 0;
+      padding: 14px 28px 62px;
+      transition: bottom 0.54s cubic-bezier(0.34, 1.36, 0.64, 1);
     }
-    #action-panel.visible { bottom: 0; }
+    #action-panel.visible { bottom:0; }
 
-    /* Drag handle */
-    .handle {
-      width: 40px; height: 4px;
-      background: rgba(255,255,255,0.14);
-      border-radius: 2px;
-      margin: 0 auto 26px;
-    }
+    .handle { width:40px; height:4px; background:rgba(245,166,35,0.18); border-radius:2px; margin:0 auto 28px; }
 
-    /* Brand row */
-    .brand-row {
-      display: flex; align-items: center; gap: 16px;
-      margin-bottom: 28px;
-    }
+    .brand-row { display:flex; align-items:center; gap:16px; margin-bottom:26px; }
 
     .brand-logo {
-      flex-shrink: 0;
-      width: 52px; height: 52px;
-      border-radius: 15px;
-      background: linear-gradient(140deg, #1a3fa0, #0d6ee0);
-      box-shadow: 0 4px 20px rgba(13,110,224,0.45);
-      display: flex; align-items: center; justify-content: center;
+      flex-shrink:0; width:54px; height:54px; border-radius:16px;
+      background: rgba(245,166,35,0.07); border:1.5px solid rgba(245,166,35,0.22);
+      display:flex; align-items:center; justify-content:center;
     }
-    .brand-logo svg { width: 28px; height: 28px; fill: #fff; }
-
-    .brand-name {
-      color: #fff;
-      font-size: 15px; font-weight: 700;
-      letter-spacing: 2px; text-transform: uppercase;
-    }
-    .brand-contact {
-      margin-top: 4px;
-      color: rgba(255,255,255,0.35);
-      font-size: 11px; letter-spacing: 0.3px;
+    .sd-logo-ring {
+      width:30px; height:30px; border-radius:50%;
+      border:6px solid #F5A623; border-right-color:rgba(30,8,15,0.7);
+      transform:rotate(-20deg);
     }
 
-    /* Separator */
-    .sep { height: 1px; background: rgba(255,255,255,0.06); margin-bottom: 28px; }
+    .brand-name { color:#F5A623; font-size:15px; font-weight:700; letter-spacing:2px; text-transform:uppercase; }
+    .brand-tag  { margin-top:3px; color:rgba(245,237,232,0.35); font-size:11px; letter-spacing:0.3px; font-style:italic; }
+    .ar-badge   { display:inline-block; margin-top:7px; background:rgba(245,166,35,0.09); border:1px solid rgba(245,166,35,0.26); border-radius:5px; padding:2px 8px; color:#F5A623; font-size:10px; font-weight:600; letter-spacing:2px; }
 
-    /* Button row */
-    .btn-row {
-      display: flex; justify-content: space-around; align-items: center;
-    }
+    .sep { height:1px; background:rgba(245,166,35,0.1); margin-bottom:28px; }
 
-    .cta {
-      display: flex; flex-direction: column; align-items: center; gap: 10px;
-      text-decoration: none;
-      -webkit-tap-highlight-color: transparent;
-    }
+    .btn-row { display:flex; justify-content:space-around; align-items:center; }
+    .cta { display:flex; flex-direction:column; align-items:center; gap:10px; text-decoration:none; -webkit-tap-highlight-color:transparent; }
+    .cta-icon { width:68px; height:68px; border-radius:21px; display:flex; align-items:center; justify-content:center; transition:transform 0.13s ease, opacity 0.13s; }
+    .cta:active .cta-icon { transform:scale(0.87); opacity:0.8; }
+    .cta-icon svg { width:28px; height:28px; fill:#fff; }
 
-    .cta-icon {
-      width: 68px; height: 68px;
-      border-radius: 21px;
-      display: flex; align-items: center; justify-content: center;
-      transition: transform 0.13s ease, opacity 0.13s;
-    }
-    .cta:active .cta-icon { transform: scale(0.87); opacity: 0.82; }
-    .cta-icon svg { width: 28px; height: 28px; fill: #fff; }
+    .cta-icon.insta  { background:linear-gradient(145deg,#833ab4,#e1306c,#f77737); box-shadow:0 8px 24px rgba(131,58,180,0.3); }
+    .cta-icon.linked { background:linear-gradient(145deg,#0a66c2,#00a0dc);          box-shadow:0 8px 24px rgba(10,102,194,0.3); }
+    .cta-icon.web    { background:linear-gradient(145deg,#7A4E60,#C4956A);           box-shadow:0 8px 24px rgba(122,78,96,0.35); }
 
-    .cta-icon.call {
-      background: linear-gradient(145deg, #1563d0, #07aaff);
-      box-shadow: 0 8px 26px rgba(7,170,255,0.35);
-    }
-    .cta-icon.mail {
-      background: linear-gradient(145deg, #d43326, #f0663a);
-      box-shadow: 0 8px 26px rgba(212,51,38,0.35);
-    }
-    .cta-icon.wa {
-      background: linear-gradient(145deg, #1aad4e, #22e06a);
-      box-shadow: 0 8px 26px rgba(34,224,106,0.35);
-    }
-
-    .cta-label {
-      color: rgba(255,255,255,0.4);
-      font-size: 11px; font-weight: 600;
-      letter-spacing: 1px; text-transform: uppercase;
-    }
+    .cta-label { color:rgba(245,237,232,0.32); font-size:11px; font-weight:600; letter-spacing:1px; text-transform:uppercase; }
   </style>
 </head>
 <body>
 
-  <!-- ── Custom scanning overlay ─────────────────────────────────────── -->
+  <!-- ── Scanning overlay ─────────────────────────────────────────── -->
   <div id="scanning-overlay" class="hidden">
     <div class="scan-frame">
       <div class="c"></div>
+      <div class="scan-inner"><div class="sd-hint-ring"></div></div>
       <div class="scan-line"></div>
     </div>
-    <p class="scan-label">Scan the card</p>
-    <p class="scan-sub">Point your camera at the business card</p>
+    <p class="scan-label">Find the coaster</p>
+    <p class="scan-sub">Point your camera at the Social Drishti coaster</p>
   </div>
 
-  <!-- ── Action panel ────────────────────────────────────────────────── -->
+  <!-- ── Action panel ─────────────────────────────────────────────── -->
   <div id="action-panel">
     <div class="handle"></div>
-
     <div class="brand-row">
-      <div class="brand-logo">
-        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-          <rect x="2"  y="2"  width="9" height="9" rx="2"/>
-          <rect x="13" y="2"  width="9" height="9" rx="2"/>
-          <rect x="2"  y="13" width="9" height="9" rx="2"/>
-          <rect x="13" y="13" width="9" height="9" rx="2"/>
-        </svg>
-      </div>
+      <div class="brand-logo"><div class="sd-logo-ring"></div></div>
       <div>
-        <div class="brand-name">Creative Windows</div>
-        <div class="brand-contact">Rajesh &nbsp;·&nbsp; +91 770 929 0535</div>
+        <div class="brand-name">Social Drishti</div>
+        <div class="brand-tag">Looking Beyond The Obvious</div>
+        <div class="ar-badge">AR EXPERIENCE</div>
       </div>
     </div>
-
     <div class="sep"></div>
-
     <div class="btn-row">
 
-      <!-- Call -->
-      <a class="cta" href="tel:+917709290535">
-        <div class="cta-icon call">
-          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36
-                     1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1
-                     C6.61 21 2 16.38 2 11c0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2
-                     2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/>
-          </svg>
+      <!-- ↓ Update href values with real Social Drishti links ↓ -->
+      <a class="cta" href="https://instagram.com/socialdrishti" target="_blank" rel="noopener">
+        <div class="cta-icon insta">
+          <svg viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
         </div>
-        <span class="cta-label">Call</span>
+        <span class="cta-label">Instagram</span>
       </a>
 
-      <!-- Email -->
-      <a class="cta" href="mailto:creativewindows.rajesh@gmail.com">
-        <div class="cta-icon mail">
-          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9
-                     2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
-          </svg>
+      <a class="cta" href="https://linkedin.com/company/socialdrishti" target="_blank" rel="noopener">
+        <div class="cta-icon linked">
+          <svg viewBox="0 0 24 24"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
         </div>
-        <span class="cta-label">Email</span>
+        <span class="cta-label">LinkedIn</span>
       </a>
 
-      <!-- WhatsApp -->
-      <a class="cta" href="https://wa.me/917709290535" target="_blank" rel="noopener">
-        <div class="cta-icon wa">
-          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148
-                     -.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297
-                     -.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173
-                     -.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298
-                     .298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207
-                     -.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52
-                     .074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875
-                     1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694
-                     .625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248
-                     -.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421
-                     7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998
-                     -3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884
-                     9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893
-                     6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815
-                     11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142
-                     1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683
-                     1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0
-                     00-3.48-8.413z"/>
-          </svg>
+      <a class="cta" href="https://socialdrishti.com" target="_blank" rel="noopener">
+        <div class="cta-icon web">
+          <svg viewBox="0 0 24 24"><path d="M12 0C5.374 0 0 5.373 0 12c0 6.628 5.374 12 12 12 6.628 0 12-5.372 12-12 0-6.627-5.372-12-12-12zm0 2c1.308 0 2.564.253 3.714.713C14.786 3.67 14 4.83 14 6v1a2 2 0 01-2 2H9a2 2 0 00-2 2v1a2 2 0 002 2 2 2 0 012 2v3a2 2 0 01-1.414 1.914C5.816 17.72 2 15.08 2 12 2 6.477 6.477 2 12 2zm6.506 5.06A9.967 9.967 0 0122 12c0 4.42-2.87 8.17-6.84 9.49L14 20v-1a2 2 0 00-2-2 2 2 0 01-2-2v-2a2 2 0 012-2 2 2 0 002-2V9c0-1.476.8-2.77 2-3.476l.506-.464z"/></svg>
         </div>
-        <span class="cta-label">WhatsApp</span>
+        <span class="cta-label">Website</span>
       </a>
 
     </div>
   </div>
 
-  <!-- ── MindAR + A-Frame Scene ──────────────────────────────────────────
-       KEY FIXES:
-       • A-Frame 1.6.0 (was 1.5.0 — caused all the crashes)
-       • renderer: physicallyCorrectLights: true  (was missing ": true")
-       • cursor: removed invalid `emitevents` property
-       • No a-image elements — replaced with pure geometry (no texture pipeline)
-       • uiScanning: hands our overlay div to MindAR for show/hide
-  ──────────────────────────────────────────────────────────────────────── -->
+  <!-- ═══════════════════════════════════════════════════════════════
+       A-FRAME + MINDAR AR SCENE
+       Target = 1×1 square (coaster). ALL content floats AROUND it.
+  ═══════════════════════════════════════════════════════════════════ -->
   <a-scene
     mindar-image="imageTargetSrc: ./targets.mind; uiScanning: #scanning-overlay;"
     color-space="sRGB"
@@ -306,118 +197,191 @@
     vr-mode-ui="enabled: false"
     device-orientation-permission-ui="enabled: false"
   >
-
-    <!-- No raycaster or cursor needed — all actions handled by HTML panel -->
     <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
-    <a-entity mindar-image-target="targetIndex: 0" id="card-target">
+    <a-entity mindar-image-target="targetIndex: 0" id="coaster-target">
 
-      <!-- ── Card base plate ────────────────────────────────────── -->
-      <a-plane
-        color="#0b1640"
-        width="1" height="0.552"
-        position="0 0 0"
-      ></a-plane>
+      <!-- ───────────────────────────────────────────────────────────
+           HALO RINGS  (radius > 0.71 clears the full 1×1 square)
+      ─────────────────────────────────────────────────────────────── -->
 
-      <!-- Top accent bar -->
-      <a-plane
-        color="#1563d0"
-        width="1" height="0.018"
-        position="0 0.267 0.001"
-      ></a-plane>
+      <!-- Outer golden ring — slow CW spin -->
+      <a-torus color="#F5A623" radius="0.76" radius-tubular="0.009" position="0 0 0.015"
+        animation="property: rotation; from: 0 0 0; to: 0 0 360; dur: 17000; loop: true; easing: linear">
+      </a-torus>
 
-      <!-- Bottom accent bar -->
-      <a-plane
-        color="#1563d0"
-        width="1" height="0.018"
-        position="0 -0.267 0.001"
-      ></a-plane>
+      <!-- Inner mauve ring — CCW, slower -->
+      <a-torus color="#9E6B7A" radius="0.64" radius-tubular="0.005" position="0 0 0.022"
+        animation="property: rotation; from: 0 0 0; to: 0 0 -360; dur: 26000; loop: true; easing: linear">
+      </a-torus>
 
-      <!-- Top-left corner square -->
-      <a-plane
-        color="#122060"
-        width="0.11" height="0.11"
-        position="-0.44 0.22 0.001"
-      ></a-plane>
+      <!-- Tilted portal ring above the coaster (appears as an ellipse in 3D perspective) -->
+      <a-torus color="#F5A623" radius="0.4" radius-tubular="0.013"
+        position="0 0.66 0.2" rotation="65 0 0"
+        animation="property: rotation; from: 65 0 0; to: 65 360 0; dur: 10000; loop: true; easing: linear">
+      </a-torus>
 
-      <!-- Bottom-right corner square -->
-      <a-plane
-        color="#122060"
-        width="0.11" height="0.11"
-        position="0.44 -0.22 0.001"
-      ></a-plane>
 
-      <!-- Company name -->
-      <a-text
-        value="CREATIVE WINDOWS"
-        position="0 0.06 0.002"
-        align="center"
-        color="#ffffff"
-        width="1.8"
-        wrap-count="22"
-      ></a-text>
+      <!-- ───────────────────────────────────────────────────────────
+           ORBITING SPHERES
+           Rotating parent entity → offset child sphere = circular orbit
+      ─────────────────────────────────────────────────────────────── -->
 
-      <!-- Tagline -->
-      <a-text
-        value="scan to connect"
-        position="0 -0.07 0.002"
-        align="center"
-        color="#5b9ee8"
-        width="1.2"
-        wrap-count="28"
-      ></a-text>
+      <!-- Fast golden sphere — inner orbit -->
+      <a-entity position="0 0 0.04"
+        animation="property: rotation; from: 0 0 0; to: 0 0 360; dur: 5400; loop: true; easing: linear">
+        <a-sphere color="#F5A623" radius="0.042" position="0.74 0 0"></a-sphere>
+      </a-entity>
 
-      <!-- ── Action hint dots (pure geometry — no texture/XHR) ── -->
-      <!-- Call dot — blue -->
-      <a-circle
-        color="#1563d0"
-        radius="0.055"
-        position="-0.25 -0.19 0.002"
-      ></a-circle>
-      <a-text
-        value="CALL"
-        position="-0.25 -0.265 0.003"
-        align="center"
-        color="#5b9ee8"
-        width="0.55"
-      ></a-text>
+      <!-- Medium cream sphere — outer orbit, 120° offset start -->
+      <a-entity position="0 0 0.04" rotation="0 0 120"
+        animation="property: rotation; from: 0 0 120; to: 0 0 480; dur: 9800; loop: true; easing: linear">
+        <a-sphere color="#F5EDE8" radius="0.03" position="0.88 0 0"></a-sphere>
+      </a-entity>
 
-      <!-- Email dot — red -->
-      <a-circle
-        color="#d43326"
-        radius="0.055"
-        position="0 -0.19 0.002"
-      ></a-circle>
-      <a-text
-        value="MAIL"
-        position="0 -0.265 0.003"
-        align="center"
-        color="#5b9ee8"
-        width="0.55"
-      ></a-text>
+      <!-- Slow tan sphere — mid orbit, 240° offset start -->
+      <a-entity position="0 0 0.04" rotation="0 0 240"
+        animation="property: rotation; from: 0 0 240; to: 0 0 600; dur: 15000; loop: true; easing: linear">
+        <a-sphere color="#C09080" radius="0.023" position="0.81 0 0"></a-sphere>
+      </a-entity>
 
-      <!-- WhatsApp dot — green -->
-      <a-circle
-        color="#1aad4e"
-        radius="0.055"
-        position="0.25 -0.19 0.002"
-      ></a-circle>
-      <a-text
-        value="WA"
-        position="0.25 -0.265 0.003"
-        align="center"
-        color="#5b9ee8"
-        width="0.55"
-      ></a-text>
+      <!-- Small sphere riding the portal ring -->
+      <a-entity position="0 0.66 0.2" rotation="65 0 0"
+        animation="property: rotation; from: 65 0 0; to: 65 360 0; dur: 6200; loop: true; easing: linear">
+        <a-sphere color="#F5A623" radius="0.034" position="0.4 0 0"></a-sphere>
+      </a-entity>
+
+
+      <!-- ───────────────────────────────────────────────────────────
+           EYE / DRISHTI MOTIF
+           "Drishti" = vision / sight in Sanskrit.
+           The eye floats above the coaster and blinks via scale.
+      ─────────────────────────────────────────────────────────────── -->
+
+      <a-entity position="0 0.66 0.15">
+
+        <!-- Outer eye ellipse — golden, breathing scale -->
+        <a-torus color="#F5A623" radius="0.22" radius-tubular="0.015"
+          scale="2.0 1.0 1.0"
+          animation="property: scale; from: 2.0 1.0 1.0; to: 2.2 1.12 1.0; dur: 2900; loop: true; dir: alternate; easing: easeInOutSine">
+        </a-torus>
+
+        <!-- Iris — deep wine fill -->
+        <a-circle color="#3D1E2C" radius="0.096" position="0 0 0.001"></a-circle>
+
+        <!-- Mauve iris ring -->
+        <a-torus color="#9E6B7A" radius="0.078" radius-tubular="0.007" position="0 0 0.012"></a-torus>
+
+        <!-- Pupil — contracts like a real pupil -->
+        <a-sphere color="#0F0608" radius="0.055" position="0 0 0.022"
+          animation="property: scale; from: 1 1 1; to: 0.55 0.55 0.55; dur: 2500; loop: true; dir: alternate; easing: easeInOutQuad">
+        </a-sphere>
+
+        <!-- Golden highlight dot — gives the eye life -->
+        <a-sphere color="#F5A623" radius="0.017" position="0.024 0.025 0.08"></a-sphere>
+
+      </a-entity>
+
+
+      <!-- ───────────────────────────────────────────────────────────
+           BRAND TEXT  (floats high above, gentle vertical bob)
+      ─────────────────────────────────────────────────────────────── -->
+
+      <a-text value="SOCIAL DRISHTI"
+        position="0 1.28 0.1" align="center"
+        color="#F5A623" width="2.7" wrap-count="20"
+        animation="property: position; from: 0 1.25 0.1; to: 0 1.31 0.1; dur: 3500; loop: true; dir: alternate; easing: easeInOutSine">
+      </a-text>
+
+      <a-text value="Looking Beyond The Obvious"
+        position="0 1.05 0.1" align="center"
+        color="#F5EDE8" width="1.85" wrap-count="35"
+        animation="property: scale; from: 0.97 0.97 0.97; to: 1.03 1.03 1.03; dur: 3200; loop: true; dir: alternate; easing: easeInOutSine">
+      </a-text>
+
+      <!-- Accent dot between eye and text -->
+      <a-sphere color="#F5A623" radius="0.016" position="0 0.95 0.1"
+        animation="property: scale; from: 1 1 1; to: 1.7 1.7 1.7; dur: 2000; loop: true; dir: alternate; easing: easeInOutSine">
+      </a-sphere>
+
+
+      <!-- ───────────────────────────────────────────────────────────
+           FLOATING KEYWORD PILLS
+           x = ±0.96 puts them outside the 1×1 coaster square.
+           Each: dark bg plate + colored top bar + white/gold text.
+           Alternating bob phases so they never move in unison.
+      ─────────────────────────────────────────────────────────────── -->
+
+      <!-- INSIGHTS — left upper -->
+      <a-entity position="-0.96 0.3 0.14"
+        animation="property: position; from: -0.96 0.26 0.14; to: -0.96 0.34 0.14; dur: 3100; loop: true; dir: alternate; easing: easeInOutSine">
+        <a-plane color="#210D14" width="0.55" height="0.19"></a-plane>
+        <a-plane color="#F5A623" width="0.55" height="0.013" position="0 0.088 0.001"></a-plane>
+        <a-text value="INSIGHTS" align="center" color="#F5A623" width="0.64" wrap-count="12" position="0 -0.008 0.01"></a-text>
+      </a-entity>
+
+      <!-- STRATEGY — right upper (opposite phase) -->
+      <a-entity position="0.96 0.3 0.14"
+        animation="property: position; from: 0.96 0.34 0.14; to: 0.96 0.26 0.14; dur: 3600; loop: true; dir: alternate; easing: easeInOutSine">
+        <a-plane color="#210D14" width="0.55" height="0.19"></a-plane>
+        <a-plane color="#F5A623" width="0.55" height="0.013" position="0 0.088 0.001"></a-plane>
+        <a-text value="STRATEGY" align="center" color="#F5A623" width="0.64" wrap-count="12" position="0 -0.008 0.01"></a-text>
+      </a-entity>
+
+      <!-- VISION — left lower (rose accent) -->
+      <a-entity position="-0.96 -0.3 0.14"
+        animation="property: position; from: -0.96 -0.34 0.14; to: -0.96 -0.26 0.14; dur: 4100; loop: true; dir: alternate; easing: easeInOutSine">
+        <a-plane color="#210D14" width="0.55" height="0.19"></a-plane>
+        <a-plane color="#9E6B7A" width="0.55" height="0.013" position="0 0.088 0.001"></a-plane>
+        <a-text value="VISION" align="center" color="#F5EDE8" width="0.64" wrap-count="12" position="0 -0.008 0.01"></a-text>
+      </a-entity>
+
+      <!-- IMPACT — right lower (rose accent, offset phase) -->
+      <a-entity position="0.96 -0.3 0.14"
+        animation="property: position; from: 0.96 -0.26 0.14; to: 0.96 -0.34 0.14; dur: 4600; loop: true; dir: alternate; easing: easeInOutSine">
+        <a-plane color="#210D14" width="0.55" height="0.19"></a-plane>
+        <a-plane color="#9E6B7A" width="0.55" height="0.013" position="0 0.088 0.001"></a-plane>
+        <a-text value="IMPACT" align="center" color="#F5EDE8" width="0.64" wrap-count="12" position="0 -0.008 0.01"></a-text>
+      </a-entity>
+
+
+      <!-- ───────────────────────────────────────────────────────────
+           RISING PARTICLES
+           Six particles at different X positions, different speeds.
+           Each loops from near the coaster surface up out of frame.
+           Varying durations → stay visually staggered over time.
+      ─────────────────────────────────────────────────────────────── -->
+
+      <a-sphere radius="0.022" color="#F5A623" position="-0.26 -0.18 0.03"
+        animation="property: position; from: -0.26 -0.18 0.03; to: -0.26 1.65 0.03; dur: 4200; loop: true; easing: linear">
+      </a-sphere>
+
+      <a-sphere radius="0.015" color="#F5EDE8" position="0.19 0.22 0.03"
+        animation="property: position; from: 0.19 0.22 0.03; to: 0.19 1.9 0.03; dur: 5800; loop: true; easing: linear">
+      </a-sphere>
+
+      <a-sphere radius="0.019" color="#F5A623" position="0.31 -0.24 0.03"
+        animation="property: position; from: 0.31 -0.24 0.03; to: 0.31 1.55 0.03; dur: 3600; loop: true; easing: linear">
+      </a-sphere>
+
+      <a-sphere radius="0.012" color="#C09080" position="-0.09 0.29 0.03"
+        animation="property: position; from: -0.09 0.29 0.03; to: -0.09 1.75 0.03; dur: 6400; loop: true; easing: linear">
+      </a-sphere>
+
+      <a-sphere radius="0.017" color="#F5A623" position="0.09 -0.37 0.03"
+        animation="property: position; from: 0.09 -0.37 0.03; to: 0.09 1.5 0.03; dur: 4000; loop: true; easing: linear">
+      </a-sphere>
+
+      <a-sphere radius="0.013" color="#F5EDE8" position="-0.39 0.08 0.03"
+        animation="property: position; from: -0.39 0.08 0.03; to: -0.39 1.8 0.03; dur: 5200; loop: true; easing: linear">
+      </a-sphere>
 
     </a-entity>
   </a-scene>
 
   <script>
-    /* ── Action panel: show/hide on target found/lost ─────────── */
     const panel  = document.getElementById('action-panel');
-    const target = document.getElementById('card-target');
-
+    const target = document.getElementById('coaster-target');
     target.addEventListener('targetFound', () => panel.classList.add('visible'));
     target.addEventListener('targetLost',  () => panel.classList.remove('visible'));
   </script>
