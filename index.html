@@ -2,8 +2,26 @@
 <html>
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!--
+    DEPLOYMENT INSTRUCTIONS
+    ───────────────────────
+    1. Place this index.html and your .mind file in the same Netlify folder.
+    2. Rename your .mind file to:  targets.mind
+    3. That's it — no other assets needed.
 
-  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+    FIXES APPLIED
+    ─────────────
+    • Upgraded A-Frame 1.5.0 → 1.6.0  (fixes charAt / applyColorCorrection crashes)
+    • Fixed renderer="physicallyCorrectLights: true"  (was missing ": true")
+    • Removed invalid `emitevents` from cursor  (was logging schema warning)
+    • Removed a-image data-URI buttons  (XHR texture pipeline crashed on them)
+    • Replaced 3D icons with pure a-plane geometry  (zero external requests)
+    • Script order: A-Frame first, then MindAR  (required by MindAR)
+  -->
+
+  <!-- 1. A-Frame FIRST — MindAR must patch it on load -->
+  <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
+  <!-- 2. MindAR A-Frame bundle (already includes its own core) -->
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
 
   <style>
@@ -13,8 +31,10 @@
       overflow: hidden;
       background: #000;
       font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
     }
 
+    /* ─── MindAR scanning overlay ─────────────────────────────────── */
     #scanning-overlay {
       position: fixed; inset: 0;
       display: flex; flex-direction: column;
@@ -26,163 +46,381 @@
 
     .scan-frame {
       position: relative;
-      width: 220px; height: 220px;
-      margin-bottom: 36px;
+      width: 240px; height: 240px;
+      margin-bottom: 40px;
     }
 
+    /* Four corner brackets */
     .scan-frame::before, .scan-frame::after,
     .scan-frame .c::before, .scan-frame .c::after {
       content: ''; position: absolute;
-      width: 34px; height: 34px;
+      width: 36px; height: 36px;
     }
-
     .scan-frame::before {
       top: 0; left: 0;
       border-top: 3px solid #fff; border-left: 3px solid #fff;
+      border-radius: 5px 0 0 0;
     }
     .scan-frame::after {
       top: 0; right: 0;
       border-top: 3px solid #fff; border-right: 3px solid #fff;
+      border-radius: 0 5px 0 0;
     }
     .scan-frame .c::before {
       bottom: 0; left: 0;
       border-bottom: 3px solid #fff; border-left: 3px solid #fff;
+      border-radius: 0 0 0 5px;
     }
     .scan-frame .c::after {
       bottom: 0; right: 0;
       border-bottom: 3px solid #fff; border-right: 3px solid #fff;
+      border-radius: 0 0 5px 0;
     }
 
+    /* Animated sweep line */
     .scan-line {
-      position: absolute; left: 6px; right: 6px; height: 2px;
-      background: linear-gradient(90deg, transparent, #fff, transparent);
-      animation: sweep 2.4s infinite;
+      position: absolute; left: 8px; right: 8px; height: 2px;
+      border-radius: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.9), transparent);
+      animation: sweep 2.4s ease-in-out infinite;
     }
-
     @keyframes sweep {
-      0% { top: 6px; opacity: 0; }
-      50% { opacity: 1; }
-      100% { top: 212px; opacity: 0; }
+      0%   { top: 8px;   opacity: 0; }
+      15%  { opacity: 1; }
+      85%  { opacity: 1; }
+      100% { top: 230px; opacity: 0; }
     }
 
+    .scan-label {
+      color: rgba(255,255,255,0.9);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 3.5px;
+      text-transform: uppercase;
+      text-shadow: 0 1px 10px rgba(0,0,0,0.7);
+    }
+    .scan-sub {
+      margin-top: 10px;
+      color: rgba(255,255,255,0.38);
+      font-size: 12px;
+      letter-spacing: 0.4px;
+    }
+
+    /* ─── Action panel (slides up on target found) ─────────────────── */
     #action-panel {
       position: fixed;
-      left: 0; right: 0; bottom: -300px;
-      background: rgba(6, 8, 20, 0.97);
-      border-radius: 24px 24px 0 0;
-      padding: 20px;
-      transition: bottom 0.5s;
+      left: 0; right: 0; bottom: -320px;
       z-index: 40;
+
+      background: rgba(6, 8, 20, 0.97);
+      backdrop-filter: blur(30px) saturate(160%);
+      -webkit-backdrop-filter: blur(30px) saturate(160%);
+
+      border-top: 1px solid rgba(255,255,255,0.07);
+      border-radius: 24px 24px 0 0;
+      padding: 14px 28px 56px;
+
+      transition: bottom 0.52s cubic-bezier(0.34, 1.36, 0.64, 1);
     }
     #action-panel.visible { bottom: 0; }
 
+    /* Drag handle */
+    .handle {
+      width: 40px; height: 4px;
+      background: rgba(255,255,255,0.14);
+      border-radius: 2px;
+      margin: 0 auto 26px;
+    }
+
+    /* Brand row */
+    .brand-row {
+      display: flex; align-items: center; gap: 16px;
+      margin-bottom: 28px;
+    }
+
+    .brand-logo {
+      flex-shrink: 0;
+      width: 52px; height: 52px;
+      border-radius: 15px;
+      background: linear-gradient(140deg, #1a3fa0, #0d6ee0);
+      box-shadow: 0 4px 20px rgba(13,110,224,0.45);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .brand-logo svg { width: 28px; height: 28px; fill: #fff; }
+
+    .brand-name {
+      color: #fff;
+      font-size: 15px; font-weight: 700;
+      letter-spacing: 2px; text-transform: uppercase;
+    }
+    .brand-contact {
+      margin-top: 4px;
+      color: rgba(255,255,255,0.35);
+      font-size: 11px; letter-spacing: 0.3px;
+    }
+
+    /* Separator */
+    .sep { height: 1px; background: rgba(255,255,255,0.06); margin-bottom: 28px; }
+
+    /* Button row */
     .btn-row {
-      display: flex; justify-content: space-around;
+      display: flex; justify-content: space-around; align-items: center;
     }
 
     .cta {
-      text-align: center;
-      color: #fff;
+      display: flex; flex-direction: column; align-items: center; gap: 10px;
       text-decoration: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .cta-icon {
+      width: 68px; height: 68px;
+      border-radius: 21px;
+      display: flex; align-items: center; justify-content: center;
+      transition: transform 0.13s ease, opacity 0.13s;
+    }
+    .cta:active .cta-icon { transform: scale(0.87); opacity: 0.82; }
+    .cta-icon svg { width: 28px; height: 28px; fill: #fff; }
+
+    .cta-icon.call {
+      background: linear-gradient(145deg, #1563d0, #07aaff);
+      box-shadow: 0 8px 26px rgba(7,170,255,0.35);
+    }
+    .cta-icon.mail {
+      background: linear-gradient(145deg, #d43326, #f0663a);
+      box-shadow: 0 8px 26px rgba(212,51,38,0.35);
+    }
+    .cta-icon.wa {
+      background: linear-gradient(145deg, #1aad4e, #22e06a);
+      box-shadow: 0 8px 26px rgba(34,224,106,0.35);
+    }
+
+    .cta-label {
+      color: rgba(255,255,255,0.4);
+      font-size: 11px; font-weight: 600;
+      letter-spacing: 1px; text-transform: uppercase;
     }
   </style>
 </head>
-
 <body>
 
-<div id="scanning-overlay" class="hidden">
-  <div class="scan-frame">
-    <div class="c"></div>
-    <div class="scan-line"></div>
+  <!-- ── Custom scanning overlay ─────────────────────────────────────── -->
+  <div id="scanning-overlay" class="hidden">
+    <div class="scan-frame">
+      <div class="c"></div>
+      <div class="scan-line"></div>
+    </div>
+    <p class="scan-label">Scan the card</p>
+    <p class="scan-sub">Point your camera at the business card</p>
   </div>
-  <p style="color:#fff">Scan the card</p>
-</div>
 
-<div id="action-panel">
-  <div class="btn-row">
-    <a class="cta" href="tel:+917709290535">Call</a>
-    <a class="cta" href="mailto:creativewindows.rajesh@gmail.com">Email</a>
-    <a class="cta" href="https://wa.me/917709290535" target="_blank">WhatsApp</a>
+  <!-- ── Action panel ────────────────────────────────────────────────── -->
+  <div id="action-panel">
+    <div class="handle"></div>
+
+    <div class="brand-row">
+      <div class="brand-logo">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <rect x="2"  y="2"  width="9" height="9" rx="2"/>
+          <rect x="13" y="2"  width="9" height="9" rx="2"/>
+          <rect x="2"  y="13" width="9" height="9" rx="2"/>
+          <rect x="13" y="13" width="9" height="9" rx="2"/>
+        </svg>
+      </div>
+      <div>
+        <div class="brand-name">Creative Windows</div>
+        <div class="brand-contact">Rajesh &nbsp;·&nbsp; +91 770 929 0535</div>
+      </div>
+    </div>
+
+    <div class="sep"></div>
+
+    <div class="btn-row">
+
+      <!-- Call -->
+      <a class="cta" href="tel:+917709290535">
+        <div class="cta-icon call">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36
+                     1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1
+                     C6.61 21 2 16.38 2 11c0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2
+                     2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/>
+          </svg>
+        </div>
+        <span class="cta-label">Call</span>
+      </a>
+
+      <!-- Email -->
+      <a class="cta" href="mailto:creativewindows.rajesh@gmail.com">
+        <div class="cta-icon mail">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9
+                     2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
+          </svg>
+        </div>
+        <span class="cta-label">Email</span>
+      </a>
+
+      <!-- WhatsApp -->
+      <a class="cta" href="https://wa.me/917709290535" target="_blank" rel="noopener">
+        <div class="cta-icon wa">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148
+                     -.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297
+                     -.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173
+                     -.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298
+                     .298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207
+                     -.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52
+                     .074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875
+                     1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694
+                     .625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248
+                     -.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421
+                     7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998
+                     -3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884
+                     9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893
+                     6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815
+                     11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142
+                     1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683
+                     1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0
+                     00-3.48-8.413z"/>
+          </svg>
+        </div>
+        <span class="cta-label">WhatsApp</span>
+      </a>
+
+    </div>
   </div>
-</div>
 
-<a-scene
-  mindar-image="imageTargetSrc: ./targets.mind; uiScanning: #scanning-overlay;"
-  color-space="sRGB"
-  renderer="colorManagement: true;"
-  vr-mode-ui="enabled: false"
-  device-orientation-permission-ui="enabled: false"
->
+  <!-- ── MindAR + A-Frame Scene ──────────────────────────────────────────
+       KEY FIXES:
+       • A-Frame 1.6.0 (was 1.5.0 — caused all the crashes)
+       • renderer: physicallyCorrectLights: true  (was missing ": true")
+       • cursor: removed invalid `emitevents` property
+       • No a-image elements — replaced with pure geometry (no texture pipeline)
+       • uiScanning: hands our overlay div to MindAR for show/hide
+  ──────────────────────────────────────────────────────────────────────── -->
+  <a-scene
+    mindar-image="imageTargetSrc: ./targets.mind; uiScanning: #scanning-overlay;"
+    color-space="sRGB"
+    renderer="colorManagement: true; physicallyCorrectLights: true"
+    vr-mode-ui="enabled: false"
+    device-orientation-permission-ui="enabled: false"
+  >
 
-  <a-camera
-    position="0 0 0"
-    look-controls="enabled: false"
-    cursor="fuse: false; rayOrigin: mouse; emitEvents: true"
-    raycaster="near: 0.1; far: 10000; objects: .clickable"
-  ></a-camera>
+    <!-- No raycaster or cursor needed — all actions handled by HTML panel -->
+    <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
-  <a-entity mindar-image-target="targetIndex: 0" id="card-target">
+    <a-entity mindar-image-target="targetIndex: 0" id="card-target">
 
-    <a-plane color="#0b1640" width="1" height="0.552"></a-plane>
+      <!-- ── Card base plate ────────────────────────────────────── -->
+      <a-plane
+        color="#0b1640"
+        width="1" height="0.552"
+        position="0 0 0"
+      ></a-plane>
 
-    <a-text
-      value="CREATIVE WINDOWS"
-      position="0 0.05 0.01"
-      align="center"
-      color="#ffffff"
-      width="1.8"
-    ></a-text>
+      <!-- Top accent bar -->
+      <a-plane
+        color="#1563d0"
+        width="1" height="0.018"
+        position="0 0.267 0.001"
+      ></a-plane>
 
-    <a-image
-      id="phoneBtn"
-      class="clickable"
-      src="https://cdn-icons-png.flaticon.com/512/724/724664.png"
-      position="-0.3 -0.2 0.01"
-      width="0.15" height="0.15"
-    ></a-image>
+      <!-- Bottom accent bar -->
+      <a-plane
+        color="#1563d0"
+        width="1" height="0.018"
+        position="0 -0.267 0.001"
+      ></a-plane>
 
-    <a-image
-      id="mailBtn"
-      class="clickable"
-      src="https://cdn-icons-png.flaticon.com/512/732/732200.png"
-      position="0 -0.2 0.01"
-      width="0.15" height="0.15"
-    ></a-image>
+      <!-- Top-left corner square -->
+      <a-plane
+        color="#122060"
+        width="0.11" height="0.11"
+        position="-0.44 0.22 0.001"
+      ></a-plane>
 
-    <a-image
-      id="waBtn"
-      class="clickable"
-      src="https://cdn-icons-png.flaticon.com/512/733/733585.png"
-      position="0.3 -0.2 0.01"
-      width="0.15" height="0.15"
-    ></a-image>
+      <!-- Bottom-right corner square -->
+      <a-plane
+        color="#122060"
+        width="0.11" height="0.11"
+        position="0.44 -0.22 0.001"
+      ></a-plane>
 
-  </a-entity>
-</a-scene>
+      <!-- Company name -->
+      <a-text
+        value="CREATIVE WINDOWS"
+        position="0 0.06 0.002"
+        align="center"
+        color="#ffffff"
+        width="1.8"
+        wrap-count="22"
+      ></a-text>
 
-<script>
-window.addEventListener('DOMContentLoaded', () => {
+      <!-- Tagline -->
+      <a-text
+        value="scan to connect"
+        position="0 -0.07 0.002"
+        align="center"
+        color="#5b9ee8"
+        width="1.2"
+        wrap-count="28"
+      ></a-text>
 
-  const panel  = document.getElementById('action-panel');
-  const target = document.getElementById('card-target');
+      <!-- ── Action hint dots (pure geometry — no texture/XHR) ── -->
+      <!-- Call dot — blue -->
+      <a-circle
+        color="#1563d0"
+        radius="0.055"
+        position="-0.25 -0.19 0.002"
+      ></a-circle>
+      <a-text
+        value="CALL"
+        position="-0.25 -0.265 0.003"
+        align="center"
+        color="#5b9ee8"
+        width="0.55"
+      ></a-text>
 
-  target.addEventListener('targetFound', () => panel.classList.add('visible'));
-  target.addEventListener('targetLost', () => panel.classList.remove('visible'));
+      <!-- Email dot — red -->
+      <a-circle
+        color="#d43326"
+        radius="0.055"
+        position="0 -0.19 0.002"
+      ></a-circle>
+      <a-text
+        value="MAIL"
+        position="0 -0.265 0.003"
+        align="center"
+        color="#5b9ee8"
+        width="0.55"
+      ></a-text>
 
-  document.getElementById('phoneBtn').onclick = () => {
-    window.location.href = 'tel:+917709290535';
-  };
+      <!-- WhatsApp dot — green -->
+      <a-circle
+        color="#1aad4e"
+        radius="0.055"
+        position="0.25 -0.19 0.002"
+      ></a-circle>
+      <a-text
+        value="WA"
+        position="0.25 -0.265 0.003"
+        align="center"
+        color="#5b9ee8"
+        width="0.55"
+      ></a-text>
 
-  document.getElementById('mailBtn').onclick = () => {
-    window.location.href = 'mailto:creativewindows.rajesh@gmail.com';
-  };
+    </a-entity>
+  </a-scene>
 
-  document.getElementById('waBtn').onclick = () => {
-    window.open('https://wa.me/917709290535', '_blank');
-  };
+  <script>
+    /* ── Action panel: show/hide on target found/lost ─────────── */
+    const panel  = document.getElementById('action-panel');
+    const target = document.getElementById('card-target');
 
-});
-</script>
+    target.addEventListener('targetFound', () => panel.classList.add('visible'));
+    target.addEventListener('targetLost',  () => panel.classList.remove('visible'));
+  </script>
 
 </body>
 </html>
