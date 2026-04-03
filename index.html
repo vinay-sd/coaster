@@ -59,9 +59,75 @@
     .cta-icon.web    { background:linear-gradient(145deg,#7A4E60,#C4956A);           box-shadow:0 8px 24px rgba(122,78,96,0.35); }
 
     .cta-label { color:rgba(245,237,232,0.32); font-size:11px; font-weight:600; letter-spacing:1px; text-transform:uppercase; }
+
+    /* ─── IMAGE OVERLAY ─────────────────────────────────────────── */
+    #coaster-overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(14, 4, 8, 0.95);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      z-index: 100;
+      opacity: 1;
+      transition: opacity 0.6s ease-out;
+    }
+    #coaster-overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    #coaster-overlay-image {
+      max-width: 90vw; max-height: 70vh;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(245, 166, 35, 0.2);
+      margin-bottom: 40px;
+      animation: slideUp 0.8s cubic-bezier(0.34, 1.36, 0.64, 1);
+    }
+
+    #coaster-overlay-text {
+      text-align: center;
+      color: #F5A623;
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      animation: fadeInUp 0.8s ease-out 0.2s both;
+    }
+
+    #coaster-overlay-subtext {
+      color: rgba(245, 237, 232, 0.6);
+      font-size: 13px;
+      margin-top: 12px;
+      animation: fadeInUp 0.8s ease-out 0.4s both;
+    }
+
+    @keyframes slideUp {
+      from {
+        opacity: 0;
+        transform: translateY(40px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
   </style>
 </head>
 <body>
+
+  <div id="coaster-overlay">
+    <img id="coaster-overlay-image" src="./coaster.jpeg" alt="Coaster Reference">
+    <div id="coaster-overlay-text">ALIGN WITH YOUR COASTER</div>
+    <div id="coaster-overlay-subtext">Match this image to proceed with AR experience</div>
+  </div>
 
   <div id="action-panel">
     <div class="handle"></div>
@@ -232,8 +298,17 @@
   <script>
     const panel  = document.getElementById('action-panel');
     const target = document.getElementById('coaster-target');
-    target.addEventListener('targetFound', () => panel.classList.add('visible'));
-    target.addEventListener('targetLost',  () => panel.classList.remove('visible'));
+    const overlay = document.getElementById('coaster-overlay');
+
+    target.addEventListener('targetFound', () => {
+      panel.classList.add('visible');
+      overlay.classList.add('hidden');
+    });
+
+    target.addEventListener('targetLost',  () => {
+      panel.classList.remove('visible');
+      overlay.classList.remove('hidden');
+    });
   </script>
 
 </body>
