@@ -2,30 +2,6 @@
 <html>
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <!--
-    DEPLOYMENT
-    ─────────────────────────────────────────────────────────────────
-    1. Compile the coaster photo at the MindAR compiler tool:
-       https://hiukim.github.io/mind-ar-js-doc/tools/compile
-    2. Save the output file as:  targets.mind
-    3. Place targets.mind + this index.html in the same folder
-    4. Deploy to Netlify / Vercel (HTTPS required for camera access)
-    5. Update the Instagram / LinkedIn / Website hrefs at the bottom
-    ─────────────────────────────────────────────────────────────────
-    AR DESIGN CONCEPT
-    The coaster itself shows through the camera — no opaque plane
-    covers it. Everything emerges *around* and *above* the coaster:
-      • Two counter-rotating halo rings orbit the perimeter
-      • A tilted golden portal ring floats above with a riding sphere
-      • Three spheres orbit the coaster at different speeds / radii
-      • The "drishti" (vision) eye motif pulses above the coaster
-      • "SOCIAL DRISHTI" text bobs gently high above
-      • Four keyword pills float on the sides (INSIGHTS / STRATEGY
-        / VISION / IMPACT), each with a gentle breathing animation
-      • Six rising particles stream upward on loop
-  -->
-
-  <!-- A-Frame FIRST, then MindAR (MindAR must patch A-Frame on load) -->
   <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
 
@@ -37,55 +13,6 @@
       font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
       -webkit-font-smoothing: antialiased;
     }
-
-    /* ─── SCANNING OVERLAY ─────────────────────────────────────── */
-    #scanning-overlay {
-      position: fixed; inset: 0;
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      pointer-events: none; z-index: 30;
-    }
-    #scanning-overlay.hidden { display: none; }
-
-    .scan-frame { position: relative; width: 220px; height: 220px; margin-bottom: 20px; }
-
-    /* Rounded-square corners to hint at the coaster shape */
-    .scan-frame::before, .scan-frame::after,
-    .scan-frame .c::before, .scan-frame .c::after {
-      content: ''; position: absolute; width: 38px; height: 38px;
-    }
-    .scan-frame::before  { top:0; left:0;  border-top:2.5px solid #F5A623; border-left:2.5px solid #F5A623;   border-radius:11px 0 0 0; }
-    .scan-frame::after   { top:0; right:0; border-top:2.5px solid #F5A623; border-right:2.5px solid #F5A623;  border-radius:0 11px 0 0; }
-    .scan-frame .c::before { bottom:0; left:0;  border-bottom:2.5px solid #F5A623; border-left:2.5px solid #F5A623;  border-radius:0 0 0 11px; }
-    .scan-frame .c::after  { bottom:0; right:0; border-bottom:2.5px solid #F5A623; border-right:2.5px solid #F5A623; border-radius:0 0 11px 0; }
-
-    .scan-inner {
-      position: absolute; inset: 16px; border-radius: 10px;
-      background: rgba(139,90,113,0.1); border: 1px solid rgba(245,166,35,0.13);
-      display: flex; align-items: center; justify-content: center;
-    }
-
-    /* Recreate the SD "O" ring as the scan hint */
-    .sd-hint-ring {
-      width: 50px; height: 50px; border-radius: 50%;
-      border: 7px solid rgba(245,166,35,0.55); border-bottom-color: transparent;
-      animation: spin-hint 2s linear infinite;
-    }
-    @keyframes spin-hint { to { transform: rotate(360deg); } }
-
-    .scan-line {
-      position: absolute; left: 16px; right: 16px; height: 1.5px;
-      background: linear-gradient(90deg, transparent, rgba(245,166,35,0.75), transparent);
-      animation: sweep 2.2s ease-in-out infinite;
-    }
-    @keyframes sweep {
-      0%   { top:16px;  opacity:0; }
-      15%  { opacity:1; }
-      85%  { opacity:1; }
-      100% { top:204px; opacity:0; }
-    }
-
-    .scan-label { color: rgba(255,255,255,0.85); font-size:12px; font-weight:700; letter-spacing:3.5px; text-transform:uppercase; text-shadow:0 1px 10px rgba(0,0,0,0.9); }
-    .scan-sub   { margin-top:8px; color:rgba(245,237,232,0.3); font-size:11px; }
 
     /* ─── ACTION PANEL ─────────────────────────────────────────── */
     #action-panel {
@@ -136,18 +63,6 @@
 </head>
 <body>
 
-  <!-- ── Scanning overlay ─────────────────────────────────────────── -->
-  <div id="scanning-overlay" class="hidden">
-    <div class="scan-frame">
-      <div class="c"></div>
-      <div class="scan-inner"><div class="sd-hint-ring"></div></div>
-      <div class="scan-line"></div>
-    </div>
-    <p class="scan-label">Find the coaster</p>
-    <p class="scan-sub">Point your camera at the Social Drishti coaster</p>
-  </div>
-
-  <!-- ── Action panel ─────────────────────────────────────────────── -->
   <div id="action-panel">
     <div class="handle"></div>
     <div class="brand-row">
@@ -160,8 +75,6 @@
     </div>
     <div class="sep"></div>
     <div class="btn-row">
-
-      <!-- ↓ Update href values with real Social Drishti links ↓ -->
       <a class="cta" href="https://instagram.com/socialdrishti" target="_blank" rel="noopener">
         <div class="cta-icon insta">
           <svg viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
@@ -182,16 +95,11 @@
         </div>
         <span class="cta-label">Website</span>
       </a>
-
     </div>
   </div>
 
-  <!-- ═══════════════════════════════════════════════════════════════
-       A-FRAME + MINDAR AR SCENE
-       Target = 1×1 square (coaster). ALL content floats AROUND it.
-  ═══════════════════════════════════════════════════════════════════ -->
   <a-scene
-    mindar-image="imageTargetSrc: ./targets.mind; uiScanning: #scanning-overlay;"
+    mindar-image="imageTargetSrc: ./targets.mind; uiScanning: no; filterMinCF: 0.0001; filterBeta: 0.001; missTolerance: 10;"
     color-space="sRGB"
     renderer="colorManagement: true; physicallyCorrectLights: true"
     vr-mode-ui="enabled: false"
@@ -201,91 +109,54 @@
 
     <a-entity mindar-image-target="targetIndex: 0" id="coaster-target">
 
-      <!-- ───────────────────────────────────────────────────────────
-           HALO RINGS  (radius > 0.71 clears the full 1×1 square)
-      ─────────────────────────────────────────────────────────────── -->
-
-      <!-- Outer golden ring — slow CW spin -->
       <a-torus color="#F5A623" radius="0.76" radius-tubular="0.009" position="0 0 0.015"
         animation="property: rotation; from: 0 0 0; to: 0 0 360; dur: 17000; loop: true; easing: linear">
       </a-torus>
 
-      <!-- Inner mauve ring — CCW, slower -->
       <a-torus color="#9E6B7A" radius="0.64" radius-tubular="0.005" position="0 0 0.022"
         animation="property: rotation; from: 0 0 0; to: 0 0 -360; dur: 26000; loop: true; easing: linear">
       </a-torus>
 
-      <!-- Tilted portal ring above the coaster (appears as an ellipse in 3D perspective) -->
       <a-torus color="#F5A623" radius="0.4" radius-tubular="0.013"
         position="0 0.66 0.2" rotation="65 0 0"
         animation="property: rotation; from: 65 0 0; to: 65 360 0; dur: 10000; loop: true; easing: linear">
       </a-torus>
 
-
-      <!-- ───────────────────────────────────────────────────────────
-           ORBITING SPHERES
-           Rotating parent entity → offset child sphere = circular orbit
-      ─────────────────────────────────────────────────────────────── -->
-
-      <!-- Fast golden sphere — inner orbit -->
       <a-entity position="0 0 0.04"
         animation="property: rotation; from: 0 0 0; to: 0 0 360; dur: 5400; loop: true; easing: linear">
         <a-sphere color="#F5A623" radius="0.042" position="0.74 0 0"></a-sphere>
       </a-entity>
 
-      <!-- Medium cream sphere — outer orbit, 120° offset start -->
       <a-entity position="0 0 0.04" rotation="0 0 120"
         animation="property: rotation; from: 0 0 120; to: 0 0 480; dur: 9800; loop: true; easing: linear">
         <a-sphere color="#F5EDE8" radius="0.03" position="0.88 0 0"></a-sphere>
       </a-entity>
 
-      <!-- Slow tan sphere — mid orbit, 240° offset start -->
       <a-entity position="0 0 0.04" rotation="0 0 240"
         animation="property: rotation; from: 0 0 240; to: 0 0 600; dur: 15000; loop: true; easing: linear">
         <a-sphere color="#C09080" radius="0.023" position="0.81 0 0"></a-sphere>
       </a-entity>
 
-      <!-- Small sphere riding the portal ring -->
       <a-entity position="0 0.66 0.2" rotation="65 0 0"
         animation="property: rotation; from: 65 0 0; to: 65 360 0; dur: 6200; loop: true; easing: linear">
         <a-sphere color="#F5A623" radius="0.034" position="0.4 0 0"></a-sphere>
       </a-entity>
 
-
-      <!-- ───────────────────────────────────────────────────────────
-           EYE / DRISHTI MOTIF
-           "Drishti" = vision / sight in Sanskrit.
-           The eye floats above the coaster and blinks via scale.
-      ─────────────────────────────────────────────────────────────── -->
-
       <a-entity position="0 0.66 0.15">
-
-        <!-- Outer eye ellipse — golden, breathing scale -->
         <a-torus color="#F5A623" radius="0.22" radius-tubular="0.015"
           scale="2.0 1.0 1.0"
           animation="property: scale; from: 2.0 1.0 1.0; to: 2.2 1.12 1.0; dur: 2900; loop: true; dir: alternate; easing: easeInOutSine">
         </a-torus>
 
-        <!-- Iris — deep wine fill -->
         <a-circle color="#3D1E2C" radius="0.096" position="0 0 0.001"></a-circle>
-
-        <!-- Mauve iris ring -->
         <a-torus color="#9E6B7A" radius="0.078" radius-tubular="0.007" position="0 0 0.012"></a-torus>
 
-        <!-- Pupil — contracts like a real pupil -->
         <a-sphere color="#0F0608" radius="0.055" position="0 0 0.022"
           animation="property: scale; from: 1 1 1; to: 0.55 0.55 0.55; dur: 2500; loop: true; dir: alternate; easing: easeInOutQuad">
         </a-sphere>
 
-        <!-- Golden highlight dot — gives the eye life -->
         <a-sphere color="#F5A623" radius="0.017" position="0.024 0.025 0.08"></a-sphere>
-
       </a-entity>
-
-
-      <!-- ───────────────────────────────────────────────────────────
-           BRAND TEXT  (floats high above, gentle vertical bob)
-      ─────────────────────────────────────────────────────────────── -->
 
       <a-text value="SOCIAL DRISHTI"
         position="0 1.28 0.1" align="center"
@@ -299,20 +170,10 @@
         animation="property: scale; from: 0.97 0.97 0.97; to: 1.03 1.03 1.03; dur: 3200; loop: true; dir: alternate; easing: easeInOutSine">
       </a-text>
 
-      <!-- Accent dot between eye and text -->
       <a-sphere color="#F5A623" radius="0.016" position="0 0.95 0.1"
         animation="property: scale; from: 1 1 1; to: 1.7 1.7 1.7; dur: 2000; loop: true; dir: alternate; easing: easeInOutSine">
       </a-sphere>
 
-
-      <!-- ───────────────────────────────────────────────────────────
-           FLOATING KEYWORD PILLS
-           x = ±0.96 puts them outside the 1×1 coaster square.
-           Each: dark bg plate + colored top bar + white/gold text.
-           Alternating bob phases so they never move in unison.
-      ─────────────────────────────────────────────────────────────── -->
-
-      <!-- INSIGHTS — left upper -->
       <a-entity position="-0.96 0.3 0.14"
         animation="property: position; from: -0.96 0.26 0.14; to: -0.96 0.34 0.14; dur: 3100; loop: true; dir: alternate; easing: easeInOutSine">
         <a-plane color="#210D14" width="0.55" height="0.19"></a-plane>
@@ -320,7 +181,6 @@
         <a-text value="INSIGHTS" align="center" color="#F5A623" width="0.64" wrap-count="12" position="0 -0.008 0.01"></a-text>
       </a-entity>
 
-      <!-- STRATEGY — right upper (opposite phase) -->
       <a-entity position="0.96 0.3 0.14"
         animation="property: position; from: 0.96 0.34 0.14; to: 0.96 0.26 0.14; dur: 3600; loop: true; dir: alternate; easing: easeInOutSine">
         <a-plane color="#210D14" width="0.55" height="0.19"></a-plane>
@@ -328,7 +188,6 @@
         <a-text value="STRATEGY" align="center" color="#F5A623" width="0.64" wrap-count="12" position="0 -0.008 0.01"></a-text>
       </a-entity>
 
-      <!-- VISION — left lower (rose accent) -->
       <a-entity position="-0.96 -0.3 0.14"
         animation="property: position; from: -0.96 -0.34 0.14; to: -0.96 -0.26 0.14; dur: 4100; loop: true; dir: alternate; easing: easeInOutSine">
         <a-plane color="#210D14" width="0.55" height="0.19"></a-plane>
@@ -336,21 +195,12 @@
         <a-text value="VISION" align="center" color="#F5EDE8" width="0.64" wrap-count="12" position="0 -0.008 0.01"></a-text>
       </a-entity>
 
-      <!-- IMPACT — right lower (rose accent, offset phase) -->
       <a-entity position="0.96 -0.3 0.14"
         animation="property: position; from: 0.96 -0.26 0.14; to: 0.96 -0.34 0.14; dur: 4600; loop: true; dir: alternate; easing: easeInOutSine">
         <a-plane color="#210D14" width="0.55" height="0.19"></a-plane>
         <a-plane color="#9E6B7A" width="0.55" height="0.013" position="0 0.088 0.001"></a-plane>
         <a-text value="IMPACT" align="center" color="#F5EDE8" width="0.64" wrap-count="12" position="0 -0.008 0.01"></a-text>
       </a-entity>
-
-
-      <!-- ───────────────────────────────────────────────────────────
-           RISING PARTICLES
-           Six particles at different X positions, different speeds.
-           Each loops from near the coaster surface up out of frame.
-           Varying durations → stay visually staggered over time.
-      ─────────────────────────────────────────────────────────────── -->
 
       <a-sphere radius="0.022" color="#F5A623" position="-0.26 -0.18 0.03"
         animation="property: position; from: -0.26 -0.18 0.03; to: -0.26 1.65 0.03; dur: 4200; loop: true; easing: linear">
